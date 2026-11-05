@@ -1,0 +1,53 @@
+{
+ "version": 1,
+ "duration": 35.67,
+ "files": {
+  "hq": "opening-hq.mp4",
+  "lite": "opening-lite.mp4",
+  "poster": "poster.jpg"
+ },
+ "scenes": [
+  {
+   "start": 0.0,
+   "end": 5.5,
+   "style": 0,
+   "tag": "I \u00b7 Cosmic web",
+   "line": "Matter gathers into filaments hundreds of millions of light-years long."
+  },
+  {
+   "start": 5.5,
+   "end": 8.83,
+   "style": 1,
+   "tag": "II \u00b7 Galaxy clusters",
+   "line": "Thousands of galaxies, held together by gravity."
+  },
+  {
+   "start": 8.83,
+   "end": 13.17,
+   "style": 1,
+   "tag": "III \u00b7 The Milky Way",
+   "line": "Hundreds of billions of stars."
+  },
+  {
+   "start": 13.17,
+   "end": 20.5,
+   "style": 2,
+   "tag": "IV \u00b7 The Solar System",
+   "line": "Eight planets, one star."
+  },
+  {
+   "start": 20.5,
+   "end": 27.83,
+   "style": 3,
+   "tag": "V \u00b7 Earth",
+   "line": "Everything we have ever known."
+  },
+  {
+   "start": 27.83,
+   "end": 35.67,
+   "style": 0,
+   "tag": "VI \u00b7 Beyond the known",
+   "line": "Where Humanity Explores What Comes Next."
+  }
+ ]
+}
