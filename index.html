@@ -1,0 +1,77 @@
+-- Zulora step 25: (a) personal data export, (b) "similar ideas" check before publishing. Safe to run more than once.
+-- (a) my_export(): gives a signed-in person a copy of THEIR OWN data only. It reads auth.uid(), so nobody can ask for someone else's data.
+--     It never includes other people's contributions or private details. Tables that do not exist yet are skipped.
+-- (b) similar_works(): finds published ideas that share many words with the idea being published, so the creator can look first.
+--     Words only. It is a hint, not a judgement that anything was copied. People you blocked or who blocked you are left out.
+
+create or replace function public._exp(p_table text, p_col text, p_limit int default 5000) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare r jsonb;
+begin
+  if auth.uid() is null or to_regclass('public.' || quote_ident(p_table)) is null then return '[]'::jsonb; end if;
+  execute format('select coalesce(jsonb_agg(to_jsonb(t)), ''[]''::jsonb) from (select * from public.%I where %I = $1 order by 1 limit %s) t', p_table, p_col, p_limit) into r using auth.uid();
+  return r;
+end $$;
+revoke all on function public._exp(text, text, int) from public, anon, authenticated;
+
+create or replace function public.my_export() returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare uid uuid := auth.uid(); out jsonb;
+begin
+  if uid is null then raise exception 'Please log in.' using errcode = '42501'; end if;
+  out := jsonb_build_object(
+    'about', 'Your own Zulora data. Other people''s private details are not included.',
+    'exported_at', now(),
+    'user_id', uid,
+    'profile', public._exp('profiles', 'user_id'),
+    'ideas', public._exp('ideas', 'user_id'),
+    'idea_versions', public._exp('idea_versions', 'user_id'),
+    'idea_claims', public._exp('idea_claims', 'user_id'),
+    'idea_evidence', public._exp('idea_evidence', 'user_id'),
+    'knowledge_items', public._exp('knowledge_items', 'user_id'),
+    'published_ideas', public._exp('works', 'author_id'),
+    'my_contributions_to_ideas', public._exp('work_evidence', 'author_id'),
+    'my_comments', public._exp('work_comments', 'author_id'),
+    'ideas_i_reacted_to', public._exp('work_reactions', 'user_id'),
+    'collaborations', public._exp('work_collabs', 'user_id'),
+    'challenge_entries', public._exp('challenge_entries', 'author_id'),
+    'evidence_requests_i_sent', public._exp('evidence_requests', 'requester_id'),
+    'verification_requests', public._exp('verification_requests', 'requester_id'),
+    'people_i_follow', public._exp('follows', 'follower_id'),
+    'people_i_blocked', public._exp('blocks', 'blocker_id'),
+    'notifications', public._exp('notifications', 'user_id'),
+    'my_searches', public._exp('search_log', 'user_id'));
+  if to_regclass('public.follows') is not null then
+    out := out || jsonb_build_object('follower_count', (select count(*) from public.follows where followee_id = uid));
+  end if;
+  return out;
+end $$;
+revoke all on function public.my_export() from public, anon;
+grant execute on function public.my_export() to authenticated;
+
+create or replace function public.similar_works(p_title text, p_text text, p_keywords text default '', p_exclude uuid default null) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare mine text[]; r jsonb;
+begin
+  if auth.uid() is null then raise exception 'Please log in.' using errcode = '42501'; end if;
+  select coalesce(array_agg(distinct w), '{}') into mine from unnest(regexp_split_to_array(lower(left(coalesce(p_title,'') || ' ' || coalesce(p_text,'') || ' ' || coalesce(p_keywords,''), 6000)), '[^a-z0-9]+')) w
+    where char_length(w) >= 5 and w not in ('about','their','there','which','would','could','should','these','those','where','while','being','using','other','think','because','people','something');
+  if coalesce(array_length(mine, 1), 0) < 6 then return '[]'::jsonb; end if;
+  select coalesce(jsonb_agg(x order by (x->>'score')::numeric desc), '[]'::jsonb) into r from (
+    select jsonb_build_object('id', c.id, 'title', coalesce(nullif(c.title, ''), left(c.expression, 60)), 'author', c.author_name, 'own', c.author_id = auth.uid(),
+      'shared', (select coalesce(jsonb_agg(w), '[]'::jsonb) from (select w from unnest(mine) w where w = any(c.toks) limit 6) s),
+      'score', round(c.sh::numeric / greatest(least(array_length(mine, 1), array_length(c.toks, 1)), 1), 2)) x
+    from (
+      select w.id, w.title, w.expression, w.author_id, w.author_name, t.toks,
+        (select count(*) from unnest(mine) m where m = any(t.toks)) sh
+      from (select * from public.works order by created_at desc limit 2000) w
+      cross join lateral (select coalesce(array_agg(distinct z), '{}') toks from unnest(regexp_split_to_array(lower(left(coalesce(w.title,'') || ' ' || coalesce(w.expression,'') || ' ' || coalesce(w.keywords,''), 6000)), '[^a-z0-9]+')) z where char_length(z) >= 5) t
+      where w.id is distinct from p_exclude
+        and (to_regclass('public.blocks') is null or not exists (select 1 from public.blocks b where (b.blocker_id = auth.uid() and b.blocked_id = w.author_id) or (b.blocker_id = w.author_id and b.blocked_id = auth.uid())))
+    ) c
+    where c.sh >= 6 and c.sh::numeric / greatest(least(array_length(mine, 1), array_length(c.toks, 1)), 1) >= 0.45
+    order by c.sh desc limit 3) q;
+  return r;
+end $$;
+revoke all on function public.similar_works(text, text, text, uuid) from public, anon;
+grant execute on function public.similar_works(text, text, text, uuid) to authenticated;
