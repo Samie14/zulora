@@ -178,6 +178,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 #tv,#tv2{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;display:none;background:#02030a;pointer-events:none;opacity:0;transition:opacity 1s ease}body.tvon #tv,body.tvon #tv2{display:block}#tv.tvf,#tv2.tvf{opacity:1}body.tvon::after{content:'';position:fixed;inset:0;z-index:2;pointer-events:none;background:linear-gradient(rgba(2,3,10,var(--dv1,.18)),rgba(2,3,10,var(--dv2,.5)) 50%,rgba(2,3,10,var(--dv3,.72)))}
 .opt.wo{background-color:rgba(6,8,22,.8);background-size:cover;background-position:center;border-color:rgba(214,178,106,.45)}
 .opt{box-sizing:border-box}
+.pl{padding-left:20px}.pl li{margin:12px 0}.pl small{opacity:.85}
 body.tvon *{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
 .lk2[aria-pressed=true]{color:var(--goldt);font-weight:700;text-decoration:none;border:1px solid var(--gold);border-radius:999px}
 html.a-t1 #wm>*{zoom:1.15}html.a-t2 #wm>*{zoom:1.3}
@@ -1732,6 +1733,28 @@ async function expDl(kind){if(EXP.busy||!sb)return;EXP.busy=true;EXP.msg='';draw
  EXP.busy=false;draw2()}
 const INB=()=>STANDALONE?'':`<div class='wk' style='margin-top:18px'>Install</div>${INS?`<button class='opt' data-w='pwainstall'><b>Install Zulora on this phone</b><span>Adds Zulora to your home screen and opens it like an app.</span></button>`:`<div class='opt'><b>Install Zulora on this phone</b><span>Open your browser menu (the three dots in Chrome) and tap Install app or Add to Home screen. On iPhone, tap Share, then Add to Home Screen.</span></div>`}`;
 const A11B=()=>`<div class='wk' style='margin-top:18px'>Display and reading</div><div class='opt' role='group' aria-label='Text size'><b>Text size</b><span>Makes everything in the reading area larger.</span><div class='row'>${[['0','Normal'],['1','Large'],['2','Extra large']].map(x=>`<button class='lk2' data-w='a11yt:${x[0]}' aria-pressed='${A11.t===+x[0]}'>${x[1]}</button>`).join('')}</div></div><div class='opt' role='group' aria-label='Background'><b>Background</b><span>Moving footage can slow some phones. Auto uses a still picture on slow networks and low-memory phones.</span><div class='row'>${[['0','Auto'],['1','Moving'],['2','Still picture']].map(x=>`<button class='lk2' data-w='a11ybg:${x[0]}' aria-pressed='${A11.bg===+x[0]}'>${x[1]}</button>`).join('')}</div></div><div class='opt' role='group' aria-label='Background dimming'><b>Background dimming</b><span>How much the dark layer covers the theme picture. Light shows the theme most. Strong makes text easiest to read.</span><div class='row'>${[['0','Light'],['1','Medium'],['2','Strong']].map(x=>`<button class='lk2' data-w='a11ydm:${x[0]}' aria-pressed='${A11.dm===+x[0]}'>${x[1]}</button>`).join('')}</div></div><button class='opt' data-w='a11yrm' role='switch' aria-checked='${A11.rm}'><b>Calm screen &middot; ${A11.rm?'On':'Off'}</b><span>Stops moving backgrounds and animations. Also on automatically if your phone is set to reduce motion.</span></button><button class='opt' data-w='a11ysr' role='switch' aria-checked='${A11.sr}'><b>Simple reading &middot; ${A11.sr?'On':'Off'}</b><span>Plain font, wider line spacing, no italics or capital letters in labels.</span></button><button class='opt' data-w='a11yhc' role='switch' aria-checked='${A11.hc}'><b>High contrast &middot; ${A11.hc?'On':'Off'}</b><span>Brighter text, darker background, clearer outlines and focus marks.</span></button>`;
+const PLX={more:{}};
+function planSteps(id,w){const V=VOC[w.vocab]||VOC.general,cl=Array.isArray(w.claims)?w.claims:[],E=ER.ev[id]||[],X=SQL27?(XPL.rows[id]||[]):null,st=w.stage||'dreaming',S=[],now=Date.now(),T=x=>Date.parse(x)||0,lc=String(V.claim||'claim').toLowerCase();
+ if(!cl.length)S.push({t:`Write one ${lc} in a single sentence that someone could check.`,why:'A clear statement makes every other step easier.'});
+ const rq=(ER.inbox||[]).filter(x=>x.work_id===id&&x.status==='pending').length;
+ if(rq)S.push({t:`${rq} request${rq>1?'s':''} to add evidence ${rq>1?'are':'is'} waiting for your answer.`,why:'People who offer to help are easy to lose if they wait.'});
+ if(X){const pend=X.filter(x=>x.outcome==='pending').sort((a,b)=>T(a.done_on)-T(b.done_on))[0];
+  if(pend)S.push({t:`Record what happened: "${pend.what.slice(0,80)}"`,why:'A result, even a disappointing one, is what makes a test count.',a:['xpopen:'+pend.id,'Record the result']});
+  const ch=E.filter(e=>e.stance==='challenges'),lch=ch.reduce((m,e)=>Math.max(m,T(e.created_at)),0);
+  if(ch.length&&!X.some(x=>T(x.created_at)>lch))S.push({t:'Someone challenged part of this. Could one small test answer them?',why:'Challenges are how an idea gets stronger.',a:['xpopen:new','Add an experiment']});
+  if(!X.length&&st!=='parked')S.push({t:'Pick the smallest test you can do this week with what you already have.',why:'Small and cheap beats big and perfect.',a:['xpopen:new','Add an experiment']});
+  if(X.length&&!X.some(x=>(x.links||[]).length)){const lt=X.slice().sort((a,b)=>T(b.created_at)-T(a.created_at))[0];S.push({t:'Add a link someone else can look at, such as a photo, file or page, to one of your experiments.',why:'Evidence a stranger can open is what a verification review needs.',a:['xpopen:'+lt.id,'Edit the latest experiment']})}
+  const fail=X.filter(x=>x.outcome==='did_not_work').sort((a,b)=>T(b.created_at)-T(a.created_at))[0];
+  if(fail&&!X.some(x=>T(x.created_at)>T(fail.created_at)))S.push({t:`Change one thing about "${fail.what.slice(0,60)}" and try again, or write down what it taught you.`,why:'A test that did not work still tells you something.',a:['xpopen:new','Add an experiment']});
+  const last=X.reduce((m,x)=>Math.max(m,T(x.done_on)),0);
+  if(st==='testing'&&last&&now-last>30*864e5)S.push({t:'It has been over a month since your last test. Do one more, or mark the idea as Parked.',why:'Parked is a fair label for an idea you are resting.',a:['stgset:parked','Mark as Parked']});
+  const open=(VRQ.rows[id]||[]).some(r=>r.status==='pending'||r.status==='needs_more');
+  if(SQL24&&w.verification!=='verified'&&!open&&X.length>=2&&X.some(x=>(x.links||[]).length))S.push({t:'You may be ready to ask for verification.',why:'You have tested more than once and shown something others can look at.',a:['vropen:1','Ask for verification']})}
+ if(SQL23&&!(CLB.rows[id]||[]).some(x=>x.status==='accepted'))S.push({t:'Invite someone who knows what you do not, such as a tester, reviewer or adviser.',why:'A second pair of eyes finds what you cannot see.'});
+ if(!S.length)S.push({t:'Nothing urgent. Write down what you have learned so far.',why:'Telling it in your own words keeps the idea moving.'});
+ return S}
+const PLB=(id,w,own)=>{if(!own||!w||!SQL15)return '';const S=planSteps(id,w),n=PLX.more[id]?S.length:Math.min(3,S.length);
+ return `<h2>Next steps</h2><p class='hint'>Suggested from what is on this page, not by AI. The list changes as you add tests, results and evidence.</p><ol class='pl'>${S.slice(0,n).map(x=>`<li><b>${esc(x.t)}</b><br><small>${esc(x.why)}</small>${x.a?`<div class='row'><button class='lk2' data-w='${esc(x.a[0])}'>${esc(x.a[1])}</button></div>`:''}</li>`).join('')}</ol>${S.length>3&&!PLX.more[id]?`<div class='row'><button class='lk2' data-w='plmore'>Show ${S.length-3} more</button></div>`:''}`};
 const STL={dreaming:'Dreaming',testing:'Testing',built:'Built',parked:'Parked'};
 const STD={dreaming:'Just an idea so far.',testing:'Trying it out.',built:'A working version exists.',parked:'Paused for now.'};
 const STGS={msg:'',busy:false};
@@ -1867,7 +1890,7 @@ const MVW=id=>{const d=MV.det[id],bk=`<div style='height:calc(var(--cy) - 40px)'
  ${kn.length?`<h2>What the creator accepted</h2>${kn.map(x=>`<div class='zi'><span class='zm'>${x.k==='question'?'?':x.k==='hypothesis'?'H':'&bull;'}</span><div><p>${esc(String(x.t||'').slice(0,700))}</p><span class='zb'>${esc(x.p||'Overview')} &middot; ${esc(KNL[x.k]||'Understanding')}${x.m?' &middot; creator’s wording':''}</span></div></div>`).join('')}<p class='cn'>These are AI readings the creator chose to keep. They are not verified facts.</p>`:''}
  ${rf.length?`<h2>Reference materials</h2><div class='rl'>${rf.map(h=>RLINK(h.u,String(h.t||'').slice(0,160))+`<small>${h.k==='a'?'Research paper'+(h.y?' &middot; '+esc(String(h.y)):''):'Encyclopedia page'}</small>`).join('')}</div><p class='cn'>Found automatically by search. Check them yourself, because a match is not proof.</p>`:''}
  ${vk.length?`<h2>Views from the creator</h2>${vk.map(k=>`<section class='vc vw'><h3>${esc(VN[k][0])}</h3>${vwBody[k](w.views[k])}</section>`).join('')}<p class='cn'>Views are AI working shared by the creator. They are not verified facts.</p>`:''}
- ${STB(id,w,own)}${XPB(id,w,own)}${VHB(id,w,own)}${VRB(id,w,own)}${COLB(id,w,own)}
+ ${PLB(id,w,own)}${STB(id,w,own)}${XPB(id,w,own)}${VHB(id,w,own)}${VRB(id,w,own)}${COLB(id,w,own)}
  ${EVW(id,w,own)}
  ${RLW(id)}
  ${mvCom(id,w,own)}
@@ -2107,6 +2130,7 @@ WS.addEventListener('click',async e=>{const b=e.target.closest('[data-w]');if(!b
  else if(a==='mvver'){MV.ver=p==='1';mvLoad()}
  else if(a==='mvstg'){MV.stg=p||'';mvLoad()}
  else if(a==='stgset'){stgSet(cs.id,p)}
+ else if(a==='plmore'){PLX.more[cs.id]=true;draw2()}
  else if(a==='mvfol'){MV.fol=p==='1';mvLoad()}
  else if(a==='fw'){fwToggle(p)}
  else if(a==='bl'){blToggle(p,b.dataset.n||'')}
