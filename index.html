@@ -703,7 +703,10 @@ async function profSave(p,onb){if(!sb||!user)return{ok:false,msg:'Please log in 
   PF.row=row;PF.off=false;PF.dirty=false;PF.loaded=true;return{ok:true}}catch(e){return{ok:false,msg:dbErr(e)}}}
 const EMPTYP={full_name:'',username:'',date_of_birth:'',country:'',field_of_study:'',interests:'',bio:''};
 async function profSkip(){try{await profSave(EMPTYP,'skipped')}catch(_){}enterWs()}
-if(sb){sb.auth.getSession().then(({data})=>{user=data.session?data.session.user:null;syncNav();if(user&&REC){if(cur!=='newpw')openP('newpw',null)}else if(user)afterAuth()});sb.auth.onAuthStateChange((_e,s)=>{user=s?s.user:null;syncNav();if(_e==='PASSWORD_RECOVERY'){REC=true;if(mode==='ws')leaveWs();if(cur!=='newpw')openP('newpw',null);return}if(!user){PF.row=null;PF.loaded=false;PF.dirty=false;if(mode==='ws')leaveWs();wipe()}})}
+const luSet=u=>{try{if(u)localStorage.setItem('zulora.lastuser',JSON.stringify({id:u.id,email:u.email||''}))}catch(_){}},luGet=()=>{try{const j=JSON.parse(localStorage.getItem('zulora.lastuser')||'null');return j&&j.id?j:null}catch(_){return null}};
+if(sb){sb.auth.getSession().then(({data})=>{user=data.session?data.session.user:null;
+  if(!user&&navigator.onLine===false&&luGet()&&!REC){const lu=luGet();user=OFU={id:lu.id,email:lu.email,offline:true};syncNav();enterWs();show('compose');return}
+  syncNav();if(user){luSet(user);setTimeout(()=>oqSync(false),1500)}if(user&&REC){if(cur!=='newpw')openP('newpw',null)}else if(user)afterAuth()});sb.auth.onAuthStateChange((_e,s)=>{if(!s&&OFU&&navigator.onLine===false)return;if(s)OFU=null;user=s?s.user:null;syncNav();if(user){luSet(user);if(_e==='SIGNED_IN')setTimeout(()=>oqSync(false),1500)}if(_e==='SIGNED_OUT'){try{localStorage.removeItem('zulora.lastuser')}catch(_){}}if(_e==='PASSWORD_RECOVERY'){REC=true;if(mode==='ws')leaveWs();if(cur!=='newpw')openP('newpw',null);return}if(!user){PF.row=null;PF.loaded=false;PF.dirty=false;if(mode==='ws')leaveWs();wipe()}})}
 const VIS=`<div class="eb">Zulora</div><h2 id="pt">Where Humanity Explores What Comes Next.</h2><blockquote>Humanity cannot build what humanity has never imagined.</blockquote>
 <p>Zulora is a platform for human imagination, ideas, possibilities, and discovery.</p>
 <p>It gives people a place to express what they imagine, explore what their ideas could become, discover connections, examine what is known and unknown, and develop possibilities into things they can investigate and test.</p>
@@ -776,11 +779,11 @@ document.addEventListener('visibilitychange',()=>{try{if(TV.on&&TV.cur&&!LITE())
 const WS=$('ws'),ST={new:'New',exploring:'Exploring',developing:'Developing'},COLS='id,title,original_expression,working_version,notes,questions,status,created_at,updated_at';
 const SH={new:'Just begun. You are still capturing the thought.',exploring:'You are asking questions and looking around the idea.',developing:'You are shaping the idea into something more concrete.'};
 const DK='zulora.draft';
-function readDraft(){try{const j=JSON.parse(sessionStorage.getItem(DK)||'null');if(j&&typeof j.x==='string'&&typeof j.t==='string')return {t:j.t,x:j.x}}catch(e){}return {t:'',x:''}}
-function storeDraft(){try{if(draft.x||draft.t)sessionStorage.setItem(DK,JSON.stringify(draft));else sessionStorage.removeItem(DK)}catch(e){}}
+function readDraft(){try{const j=JSON.parse(localStorage.getItem(DK)||sessionStorage.getItem(DK)||'null');if(j&&typeof j.x==='string'&&typeof j.t==='string')return {t:j.t,x:j.x}}catch(e){}return {t:'',x:''}}
+function storeDraft(){try{if(draft.x||draft.t)localStorage.setItem(DK,JSON.stringify(draft));else{localStorage.removeItem(DK);sessionStorage.removeItem(DK)}}catch(e){}}
 /* ed: unsaved edits to existing ideas, keyed by idea id. Kept in memory so navigating inside the workspace never loses typed text. */
 let ideas=null,ierr='',lastRow=null,draft=readDraft(),cs={v:'home'},ed={};const scr={};
-function wipe(){try{tvOff()}catch(_){}vsClear();for(const k in CI)delete CI[k];VT.img='';VT.err='';ideas=null;ierr='';lastRow=null;ed={};draft={t:'',x:''};try{sessionStorage.removeItem(DK)}catch(e){}}
+function wipe(){try{tvOff()}catch(_){}vsClear();for(const k in CI)delete CI[k];VT.img='';VT.err='';ideas=null;ierr='';lastRow=null;ed={};draft={t:'',x:''};try{sessionStorage.removeItem(DK);localStorage.removeItem(DK)}catch(e){}}
 const D=s=>new Date(s).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'});
 const dep=()=>(history.state&&history.state.d)||0;
 const lkey=()=>'zulora.last.'+((user&&(user.id||user.email))||'anon');let lmem=null;
@@ -2013,7 +2016,7 @@ const HUBV=()=>{const top=`<div style='height:calc(var(--cy) - 40px)'></div><but
  if(HT==='overview')return top+OVV();if(!HUB)return top+"<p role='status'>Loading&hellip;</p>";return top+KNV()};
 const V2={
  world:()=>{const T=cs.a==='t',cur=getWorld();return `<div style='height:calc(var(--cy) - 24px)'></div><div class='wk ctr'>${T?'Theme':'Welcome'}</div><h1 class='q'>${T?'Choose your theme':'What world do you think in?'}</h1><p class='sub'>This sets the world that unfolds behind your ideas. It does not limit what you can imagine. You can change it any time with Theme at the top.</p>${WORLDS_LIST.map(w=>`<button class='opt wo' style="background-image:linear-gradient(90deg,rgba(4,6,18,.9),rgba(4,6,18,.5)),url(${THEME_VIDEO_BASE}${w[0]}.jpg)" data-w='world:${w[0]}'${T&&cur===w[0]?" aria-current='true'":''}><b>${w[1]}${T&&cur===w[0]?' &middot; current':''}</b><span>${w[2]}</span></button>`).join('')}${T?"<button class='lk2' data-w='back'>Keep my current theme</button>":''}`},
- compose:()=>`<div style='height:calc(var(--cy) - 24px)'></div><div class='wk ctr'>Imagination</div><h1 class='q'>What do you imagine?</h1><p class='sub'>Write it in your own words. Even an unfinished thought belongs here.</p><textarea id='cx' class='bare' maxlength='5000' rows='4' aria-label='Your idea, in your own words'>${esc(draft.x)}</textarea><input id='ct' class='bare t' maxlength='200' aria-label='Title (optional)' placeholder='Title (optional)' value='${esc(draft.t)}'><p class='ms' id='cm' role='status'></p><div class='row'><button class='wg' data-w='save'>Explore</button></div><p class='hint ctr'>Your idea is saved exactly as written. Then Zulora's AI reads it (the text is sent to a free NVIDIA-hosted model).</p><div class='row'><button class='lk2' data-w='nav:home'>My dashboard${ideas&&ideas.length?' ('+ideas.length+')':''}</button><button class='lk2' data-w='disc'>Discard draft</button></div>`,
+ compose:()=>`<div style='height:calc(var(--cy) - 24px)'></div><div class='wk ctr'>Imagination</div><h1 class='q'>What do you imagine?</h1><p class='sub'>Write it in your own words. Even an unfinished thought belongs here.</p><textarea id='cx' class='bare' maxlength='5000' rows='4' aria-label='Your idea, in your own words'>${esc(draft.x)}</textarea><input id='ct' class='bare t' maxlength='200' aria-label='Title (optional)' placeholder='Title (optional)' value='${esc(draft.t)}'>${OFB()}<p class='ms' id='cm' role='status'></p><div class='row'><button class='wg' data-w='save'>Explore</button></div><p class='hint ctr'>Your idea is saved exactly as written. Then Zulora's AI reads it (the text is sent to a free NVIDIA-hosted model).</p><div class='row'><button class='lk2' data-w='nav:home'>My dashboard${ideas&&ideas.length?' ('+ideas.length+')':''}</button><button class='lk2' data-w='disc'>Discard draft</button></div>`,
  choose:()=>{const i=findI(cs.id);if(!i)return NF();return `<div style='height:calc(var(--cy) + 6px)'></div><div class='wk'>Stage II &middot; Choose</div><h1 class='q lft'>How would you like to explore this idea?</h1><div class='ob ob2'>${esc(i.original_expression)}</div><p class='ms'>Saved to your account exactly as you wrote it.</p><button class='opt' data-w='go-text'><b>Text exploration</b><span>Interpretations, clarifying questions, alternatives, improvements, limitations and next steps.</span><em>Sends this idea's text to an external AI (a free NVIDIA-hosted model). It can be slow or unavailable.</em></button><button class='opt' data-w='go-visual'><b>Visual exploration</b><span>Images, diagrams, sketches and systems.</span><em>Three pictures: a concept, a technical sketch and a developed solution. Sends your idea's text to external AI services (NVIDIA trial) and can take a few minutes or be unavailable.</em></button><p class='hint'>The animation behind you is visual only. It is not an analysis of your idea.</p><button class='lk2' data-w='finish'>Skip exploring and open my dashboard</button>`},
  results:()=>{const i=findI(cs.id);if(!i)return NF();const S=CIS(i.id),un=S.interpret.length+S.explore.length,any=S.ran.interpret||S.ran.explore;
   return `<div style='height:calc(var(--cy) - 40px)'></div><div class='wk'>Stage III &middot; Exploration</div>${ORIG(i)}<div class='tb' role='tablist' aria-label='Kind of exploration'><button role='tab' aria-selected='${S.mode==='interpret'}' data-w='rtab:interpret'>Interpretations</button><button role='tab' aria-selected='${S.mode==='explore'}' data-w='rtab:explore'>Possibilities</button></div><div class='ci rs' aria-live='polite'>${RC(S)}${S.note?`<p class='ms${S.noteErr?' er':''}' role='status'>${esc(S.note)}</p>`:''}</div><p class='hint'>AI suggestions are not your words and may be wrong. Only what you accept or modify becomes part of your idea.${any&&un?' '+un+' unanswered suggestion'+(un>1?'s':'')+' will not be kept.':''}</p><button class='wg' data-w='finish'>Finish and open my dashboard</button>`},
@@ -2021,7 +2024,7 @@ const V2={
 imag:()=>{const i=findI(cs.id);if(!i)return NF();const v=curVals(i),S=CIS(i.id);
  return `<div style='height:calc(var(--cy) - 40px)'></div><div class='wk'>Imagination</div><h1>${ttl(i)}</h1><label id='ol'>Your original expression (never changed)</label><div class='ob' role='note' aria-labelledby='ol'>${esc(i.original_expression)}</div>${IGS(i,S,v)}<details class='orig edt'><summary>Edit my title, working version and notes</summary><label for='f_title'>Title</label><input id='f_title' maxlength='200' value='${esc(v.title)}'>${tx('working_version','Working version',v)}${tx('notes','My notes',v,4)}<p class='ms${ed[i.id]?' wn':''}' id='im' role='status'>${ed[i.id]?'Unsaved changes restored.':''}</p>${SAVEB}</details>${EVO(i)}${CLV(i)}<button class='lk2' data-w='nav:compose'>Write another idea</button><button class='wg wd' data-w='del'>Delete idea</button>`},
  pick:()=>{const an=cs.a==='anim';return `<div style='height:calc(var(--cy) - 24px)'></div><div class='wk'>${an?'Animation':'Photos'}</div><h1>Choose an idea first</h1><p>${an?'Animation starts from one of your idea\'s pictures.':'Photos are made from one of your ideas.'}</p>${!ideas?'<p role=\'status\'>Loading your ideas&hellip;</p>':!ideas.length?"<p>No ideas yet.</p><button class='wg' data-w='nav:compose'>Write your first idea</button>":ideas.map(i=>`<button class='wc' data-w='pk:${esc(i.id)}'><b>${ttl(i)}</b><small>${ST[i.status]||esc(i.status)} &middot; Updated ${D(i.updated_at||i.created_at)}</small></button>`).join('')}`},
- home:()=>`<div style='height:calc(var(--cy) - 24px)'></div><button id='star' data-w='star' aria-label='Begin a new idea'></button><h1 class='q'>Dashboard</h1><p class='sub'>${draft.x?'Your unsaved draft is waiting. Touch the light to continue.':'Touch the light to begin a new idea.'}</p>${LIST()}${NTB()}${CHB()}<button class='lk2' data-w='nav:hub'>Knowledge Hub</button><button class='lk2' data-w='nav:profile'>Profile and account</button>`,
+ home:()=>`<div style='height:calc(var(--cy) - 24px)'></div><button id='star' data-w='star' aria-label='Begin a new idea'></button><h1 class='q'>Dashboard</h1><p class='sub'>${draft.x?'Your unsaved draft is waiting. Touch the light to continue.':'Touch the light to begin a new idea.'}</p>${OFB()}${OQB()}${LIST()}${NTB()}${CHB()}<button class='lk2' data-w='nav:hub'>Knowledge Hub</button><button class='lk2' data-w='nav:profile'>Profile and account</button>`,
  idea:()=>{const i=findI(cs.id);if(!i)return NF();const a=AREAS.some(x=>x[0]===cs.a)?cs.a:'story',v=curVals(i);let c='';
   if(a==='story')c=`<label id='ol'>Original expression (never changed)</label><div class='ob' role='note' aria-labelledby='ol'>${esc(i.original_expression)}</div><label for='f_title'>Title</label><input id='f_title' maxlength='200' value='${esc(v.title)}'>${tx('working_version','Working version',v)}<p class='ms${ed[i.id]?' wn':''}' id='im' role='status'>${ed[i.id]?'Unsaved changes restored.':''}</p>${SAVEB}<button class='wg wd' data-w='del'>Delete idea</button>`;
   else if(a==='canvas')c=`<p>A place for sketches, diagrams and images connected to this idea.</p>${NOTB('Nothing can be drawn or saved here yet. Visual exploration also needs an image service that is not connected.')}`;
@@ -2053,15 +2056,46 @@ async function loadIdeas2(){ierr='';if(!sb)return;sql12Probe();sql15Probe();
  catch(err){ierr=dbErr(err);ideas=null}
  if(mode==='ws'&&cs.v==='compose'){const l=WS.querySelector('[data-w="nav:home"]');if(l&&ideas)l.textContent='My dashboard'+(ideas.length?' ('+ideas.length+')':'')}
  else if(mode==='ws'&&!(cs.v==='results'&&CI[cs.id]&&CI[cs.id].busy))draw2()}
+/* Offline drafting: ideas written without internet wait on this phone (per account) and upload when the connection is back. */
+const OQK='zulora.queue.',LUK='zulora.lastuser',OQ={busy:false,msg:''};let OFU=null;
+const oqKey=()=>OQK+((user&&user.id)||'none');
+function oqRead(){try{const a=JSON.parse(localStorage.getItem(oqKey())||'[]');return Array.isArray(a)?a.filter(x=>x&&typeof x.x==='string'&&x.x.trim()):[]}catch(_){return[]}}
+function oqWrite(a){try{if(a.length)localStorage.setItem(oqKey(),JSON.stringify(a));else localStorage.removeItem(oqKey());return true}catch(_){return false}}
+const isNet=e=>navigator.onLine===false||/failed to fetch|networkerror|network request failed|load failed|could not reach/i.test(String((e&&e.message)||e||''));
+function oqAdd(t,x,tried){const a=oqRead();if(a.length>=50)return 'full';a.push({t:String(t||'').slice(0,200),x:String(x),at:Date.now(),tried:!!tried});return oqWrite(a)?'ok':'nostore'}
+async function oqSync(manual){if(OQ.busy)return;const a0=oqRead();if(!a0.length)return;
+ if(!sb||!user||OFU){if(manual){OQ.msg='Log in to upload your waiting ideas.';if(mode==='ws')draw2()}return}
+ if(navigator.onLine===false){if(manual){OQ.msg='Still offline. Your ideas are safe on this phone.';if(mode==='ws')draw2()}return}
+ OQ.busy=true;OQ.msg='Uploading…';if(mode==='ws'&&cs.v==='home')draw2();
+ try{await loadIdeas2();let a=oqRead(),n=0,bad=0,net=false;
+  for(const it of a){
+   if(it.tried&&ideas&&ideas.some(i=>i.original_expression===it.x&&Date.parse(i.created_at)>=it.at-60000)){n++;const c=oqRead().filter(z=>!(z.at===it.at&&z.x===it.x));oqWrite(c);continue}
+   try{const {error}=await sb.from('ideas').insert({original_expression:it.x,working_version:it.x,title:(it.t||'').trim()||null,status:'new'});
+    if(error){if(isNet(error)){net=true;break}bad++;continue}
+    n++;oqWrite(oqRead().filter(z=>!(z.at===it.at&&z.x===it.x)))}
+   catch(e){if(isNet(e)){net=true;break}bad++}}
+  await loadIdeas2();
+  OQ.msg=(n?n+' idea'+(n>1?'s':'')+' uploaded. ':'')+(net?'The connection dropped. The rest will upload later. ':'')+(bad?bad+' could not be uploaded. They are still on this phone. ':'')}
+ catch(_){OQ.msg='Could not upload now. Your ideas are still on this phone.'}
+ OQ.busy=false;if(mode==='ws')draw2()}
+const OQB=()=>{const a=oqRead();if(!a.length&&!OQ.msg)return '';return `<h2>Waiting to upload${a.length?' ('+a.length+')':''}</h2>${OQ.msg?`<p class='ms wn' role='status'>${esc(OQ.msg)}</p>`:''}${a.length?`<p class='hint'>Written without internet. These are saved only on this phone until they upload.</p>${a.map((it,i)=>`<div class='zi'><span class='zm'>&bull;</span><div><p>${esc((it.t?it.t+': ':'')+it.x.slice(0,120))}${it.x.length>120?'…':''}</p><span class='zb'>${D(it.at)}</span> <button class='lk2' data-w='oqrm:${i}'>Remove</button></div></div>`).join('')}<button class='wg' data-w='oqgo'${OQ.busy?' disabled':''}>Upload now</button>`:''}`};
+const OFB=()=>navigator.onLine===false?"<p class='ms wn' role='status'>You are offline. You can still write. Your idea will wait on this phone and upload when you are back online. AI exploration needs internet.</p>":'';
+addEventListener('offline',()=>{if(mode==='ws'&&(cs.v==='compose'||cs.v==='home'))draw2()});
+addEventListener('online',async()=>{if(!sb)return;
+ if(OFU){let ss=null;try{const {data}=await sb.auth.getSession();ss=data&&data.session}catch(_){}
+  if(ss){OFU=null;user=ss.user;luSet(user);syncNav();loadIdeas2()}else{OFU=null;user=null;syncNav();if(mode==='ws')leaveWs();return}}
+ if(mode==='ws'&&(cs.v==='compose'||cs.v==='home'))draw2();oqSync(false)});
 async function saveNew(b){if(!draft.x.trim()){say('cm','Write your idea first.',1);return}if(!sb||!user){say('cm','You are not signed in.',1);return}
+ const qd=(tried)=>{const r=oqAdd(draft.t,draft.x,tried);if(r==='ok'){draft={t:'',x:''};storeDraft();draw2();OQ.msg='';say('cm','No internet. Your idea is saved on this phone and will upload when you are back online. You can find it on your dashboard.',2);return true}say('cm',r==='full'?'This phone already holds 50 waiting ideas. Connect to the internet first. Your text is still here.':'Could not save on this phone. Your text is still here.',1);return false};
+ if(navigator.onLine===false||OFU){qd(false);return}
  b.disabled=true;say('cm','Saving...');
  try{
   /* original_expression is sent exactly as typed (not trimmed, not rewritten) and is never included in any later update. */
   const {data,error}=await sb.from('ideas').insert({original_expression:draft.x,working_version:draft.x,title:draft.t.trim()||null,status:'new'}).select(COLS).single();
-  if(error||!data){say('cm','Could not save: '+(error?dbErr(error):'no confirmation from the database')+' Your text is still here.',1);return}
+  if(error&&isNet(error)){qd(true);return}if(error||!data){say('cm','Could not save: '+(error?dbErr(error):'no confirmation from the database')+' Your text is still here.',1);return}
   draft={t:'',x:''};storeDraft();lastRow=data;if(ideas)ideas=[data,...ideas];else loadIdeas2();
   delete CI[data.id];setLast(data.id);FX.begin(data.id);FX.warp();zoomNext=true;CIS(data.id).insTried=true;swap('imag',data.id);ciRun('understand',data.id)}
- catch(err){say('cm','Could not save: '+dbErr(err)+' Your text is still here.',1)}
+ catch(err){if(isNet(err))qd(true);else say('cm','Could not save: '+dbErr(err)+' Your text is still here.',1)}
  finally{b.disabled=false}}
 async function updIdea(b){const i=findI(cs.id);if(!i||!sb)return false;const v=ed[i.id];if(!v){say('im','No changes to save.');return false}
  b.disabled=true;say('im','Saving...');
@@ -2087,6 +2121,8 @@ WS.addEventListener('click',async e=>{const b=e.target.closest('[data-w]');if(!b
   else{const ta=p==='anim'?'anim':'ph';if(ta==='anim')animStyle=null;if(lid){if(!(cs.v==='visual'&&cs.id===lid&&(cs.a==='anim')===(ta==='anim')))push('visual',lid,ta)}else if(!(cs.v==='pick'&&cs.a===ta))push('pick',null,ta)}}
  else if(a==='area'){if(p!==cs.a)swap('idea',id,p);ixEnsure(id)}
  else if(a==='mvfork'){mvFork(p)}
+ else if(a==='oqgo'){oqSync(true)}
+ else if(a==='oqrm'){const q=oqRead(),k=+p;if(q[k]&&confirm('Remove this waiting idea from this phone? It has not been uploaded and cannot be brought back.')){q.splice(k,1);oqWrite(q);draw2()}}
  else if(a==='erask'){ER.open=b.dataset.i;ER.msg='';draw2()}
  else if(a==='ercx'){ER.open=null;draw2()}
  else if(a==='ersend'){erSend(b.dataset.i)}
